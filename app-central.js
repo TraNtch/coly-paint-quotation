@@ -320,6 +320,7 @@ async function unlockManagerRecords(){
   managerRecordsPin=pin;
   try{
     managerRecordsUnlocked=true;
+    await populateManagerSalesmen();
     $("managerRecordsFilters").style.display="grid";
     $("managerRecordsStats").style.display="grid";
     $("managerRecordsTableWrap").style.display="block";
