@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coly Paint Quotation Approval Tool</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="app-logo-wrap"><img class="app-logo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Coly Paint"></div>
+      <div><h1>Coly Paint Quotation Tool</h1><small>Shared sales page → enter salesman name → GM approval → PDF</small></div>
+    </div>
+    <div id="statusBadge" class="status">DRAFT / PENDING APPROVAL</div>
+  </div>
+
+  <div class="grid">
+    <div class="card editor">
+      <h2>Quotation Entry</h2>
+      <div id="salesmanSetup" class="scanbox" style="display:none">
+        <h3>Manager Settings — Salesman Setup</h3>
+        <div class="small" style="margin-bottom:6px">Manager PIN required to add/remove salesmen and assign each salesman their own PIN for viewing old quotations.</div>
+        <div class="scanrow">
+          <input id="salesmanSetupPin" type="password" placeholder="Manager PIN" style="max-width:150px">
+          <input id="newSalesmanName" placeholder="New salesman name" style="max-width:200px">
+          <input id="newSalesmanPin" type="password" inputmode="numeric" placeholder="Salesman PIN" style="max-width:140px">
+          <button class="btn" type="button" onclick="addSalesman()">Add Salesman</button>
+        </div>
+        <div id="salesmanList" style="margin-top:8px"></div>
+      </div>
+
+      <div class="scanbox">
+        <h3>Scan Customer Name Card</h3>
+        <div class="scanrow">
+          <label style="margin:0">
+            <input id="namecardInput" type="file" accept="image/*" capture="environment" style="display:none">
+            <span class="btn" style="display:inline-block">📷 Snap / Upload Name Card</span>
+          </label>
+          <button class="btn secondary" type="button" onclick="clearNamecard()">Clear</button>
+        </div>
+        <div class="scanstatus" id="scanStatus">Take a clear photo of the business card. OCR will extract the contact details.</div>
+        <div class="scanpreview" id="scanPreview"><img id="namecardImage" alt="Name card preview"></div>
+        <div class="scanresult" id="scanResult">
+          <div class="small">Please confirm the extracted information before applying it to the quotation.</div>
+          <div class="formgrid">
+            <div><label>Company</label><input id="scanCompany"></div>
+            <div><label>Contact Person</label><input id="scanPerson"></div>
+            <div><label>Phone</label><input id="scanPhone"></div>
+            <div><label>Email</label><input id="scanEmail"></div>
+            <div class="full"><label>Address</label><textarea id="scanAddress"></textarea></div>
+          </div>
+          <div class="actions">
+            <button class="btn success" type="button" onclick="applyScannedCustomer()">Use These Details</button>
+          </div>
+        </div>
+      </div>
+      <div class="formgrid">
+        <div>
+          <label>Salesman Name</label>
+          <select id="salesmanName">
+            <option value="">Select salesman</option>
+          </select>
+        </div>
+        <div><label>Date</label><input id="quoteDate" type="date"></div>
+        <div><label>Customer / Company</label><input id="customer"></div>
+        <div><label>Attention</label><input id="attention"></div>
+        <div><label>Phone</label><input id="phone"></div>
+        <div><label>Email</label><input id="email"></div>
+        <div class="full"><label>Address</label><textarea id="address"></textarea></div>
+        <div><label>Payment Terms</label><input id="payment" value="30 days"></div>
+      </div>
+
+      <h2 style="margin-top:14px">Items</h2><div class="small" style="margin:-4px 0 6px">Use <b>+ Pack</b> when the same product has another packing size and price.</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:10.5%">ITEM</th>
+            <th style="width:42.5%">DESCRIPTION</th>
+            <th style="width:16%">CODE</th>
+            <th style="width:11%">PACKING</th>
+            <th style="width:20%">UNIT PRICE</th>
+          </tr>
+        </thead>
+        <tbody id="itemRows"></tbody>
+      </table>
+      <div class="actions">
+        <button class="btn secondary" onclick="addItem()">+ Add item</button>
+        <button class="btn" onclick="saveDraft()">Save / Submit for Approval</button>
+      </div>
+
+      <h2 style="margin-top:14px">Previous Quotations</h2>
+      <div class="approvalbox">
+        <div class="small" style="margin-bottom:7px">Select your salesman name and enter your personal PIN to view only your own approved quotation records.</div>
+        <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <input id="salesmanHistoryPin" type="password" inputmode="numeric" placeholder="Your PIN" style="max-width:150px">
+          <button type="button" class="btn secondary" onclick="unlockQuoteHistory()">View My Records</button>
+          <button type="button" class="btn secondary" onclick="lockQuoteHistory()">Lock</button>
+        </div>
+        <div id="historySearchWrap" style="display:none;margin-bottom:8px">
+          <input id="historyCustomerSearch" placeholder="Search by customer name or quotation no." oninput="renderQuoteHistory()">
+        </div>
+        <div id="quoteHistory"><div class="small">Select a salesman and enter the correct PIN to view quotation history.</div></div>
+      </div>
+
+      <div class="actions" style="justify-content:flex-end;margin-top:10px">
+        <button type="button" class="btn secondary" onclick="toggleSalesmanSetup()">Manager Settings</button>
+      </div>
+      <h2 style="margin-top:8px">GM Approval</h2>
+      <div class="approvalbox">
+        <p><b>This is a shared page for all salesmen.</b> The manager creates the salesman list and assigns each salesman a personal PIN. Each salesman selects their name when preparing a quotation. PDF generation remains locked until manager approval.</p>
+        <label>Manager Approval PIN</label>
+        <input id="managerPin" type="password" placeholder="Demo PIN: 1234">
+        <div class="actions">
+          <button class="btn success" onclick="approveQuote()">Approve quotation</button>
+          <button class="btn secondary" onclick="rejectQuote()">Reject / return to salesman</button>
+        </div>
+        <p class="small">Prototype security: the approval PIN is local to this demo. For the live public page, salesman login is not required; only manager approval should be protected server-side.</p>
+      </div>
+    </div>
+
+    <div class="card quote-preview">
+      <h2 class="no-print">Live Preview</h2>
+      <div class="paper" id="paper">
+        <div class="coly-letterhead">
+          <div class="letterhead-main">
+            <img class="letterhead-logo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Coly Paint">
+            <div class="letterhead-text">
+              <div class="company-name">Coly Paint Sdn. Bhd.</div>
+              <div class="company-reg">(1346035-U)</div>
+              <div class="company-address">No. 421-B, Batu 14, Jalan Kapar, 42200 Kapar, Klang, Selangor Darul Ehsan.</div>
+              <div class="company-contact">Tel: 016-920 9830</div>
+            </div>
+          </div>
+          <div class="letterhead-rule"></div>
+        </div>
+
+        <div class="quote-top">
+          <div class="customer-block">
+            <div>Customer To:</div>
+            <div class="customer-name" id="pCustomer">—</div>
+            <div id="pAddress">—</div>
+            <div>Tel: <span id="pPhone">—</span></div>
+            <div id="emailLine">Email: <span id="pEmail">—</span></div>
+            <div id="attnLine">Attn: <span id="pAttention">—</span></div>
+          </div>
+          <div class="quote-meta">
+            <div class="quote-word">QUOTATION</div>
+            <div>No.: <span id="pQuoteNo"></span></div>
+            <div>Date: <span id="pDate"></span></div>
+            <div>Prepared by: <span id="pSalesman"></span></div>
+          </div>
+        </div>
+
+        <table class="qtable coly-table">
+          <thead>
+            <tr>
+              <th style="width:10.5%">ITEM</th>
+              <th style="width:42.5%">DESCRIPTION</th>
+              <th style="width:16%">CODE</th>
+              <th style="width:11%">PACKING</th>
+              <th style="width:20%">UNIT PRICE</th>
+            </tr>
+          </thead>
+          <tbody id="previewItems"></tbody>
+        </table>
+
+        <div class="coly-terms">
+          <div><b>TERMS OF PAYMENT:</b> <span id="pPayment"></span></div>
+          <div><b>VALIDITY:</b> 30 DAYS</div>
+          <div style="margin-top:12px">We hope the price quoted above will meet your requirement</div>
+          <div>And we are looking forward to hear you soon.</div>
+          <div style="margin-top:28px">Thank you.</div>
+          <div style="margin-top:54px">No signature requires as computer generated.</div>
+        </div>
+      </div>
+
+      <div class="actions no-print">
+        <button id="pdfBtn" class="btn success" disabled onclick="generatePDF()">Generate PDF</button>
+        <button class="btn secondary" onclick="resetAllInputs()">Reset All Inputs</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="logo-1.js"></script>
+<script src="logo-2.js"></script>
+<script src="logo-3.js"></script>
+<script src="logo-4.js"></script>
+<script src="logo-5.js"></script>
+<script src="logo-6.js"></script>
+<script src="logo-7.js"></script>
+<script src="logo-8.js"></script>
+<script src="logo-set.js"></script>
+<script src="app-1.js"></script>
+<script src="app-2.js"></script>
+<script src="app-3.js"></script>
+</body>
+</html>
