@@ -12,7 +12,7 @@
   <div class="topbar">
     <div class="brand">
       <div class="app-logo-wrap"><img class="app-logo" src="logo.png" alt="Coly Paint"></div>
-      <div><h1>Coly Paint Quotation Tool</h1><small>Shared sales page → enter salesman name → GM approval → PDF</small></div>
+      <div><h1>Coly Paint Quotation Tool</h1><small>Shared sales page → central records → GM approval → PDF</small></div>
     </div>
     <div id="statusBadge" class="status">DRAFT / PENDING APPROVAL</div>
   </div>
@@ -118,7 +118,7 @@
           <button class="btn success" onclick="approveQuote()">Approve quotation</button>
           <button class="btn secondary" onclick="rejectQuote()">Reject / return to salesman</button>
         </div>
-        <p class="small">Prototype security: the approval PIN is local to this demo. For the live public page, salesman login is not required; only manager approval should be protected server-side.</p>
+        <p class="small">Central trial mode: salesman records, quotation history, approval status and quotation numbering are stored through the shared database API.</p>
       </div>
     </div>
 
