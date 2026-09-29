@@ -17,6 +17,55 @@
     <div id="statusBadge" class="status">DRAFT / PENDING APPROVAL</div>
   </div>
 
+
+  <div id="managerRecordsPage" class="card manager-records-page" style="display:none">
+    <div class="manager-records-head">
+      <div>
+        <h2 style="margin:0">Manager Quotation Records</h2>
+        <div class="small">Search and review quotations from all salesmen. Manager PIN required.</div>
+      </div>
+      <button type="button" class="btn secondary" onclick="closeManagerRecords()">Close</button>
+    </div>
+
+    <div class="manager-unlock">
+      <input id="managerRecordsPin" type="password" placeholder="Manager PIN" style="max-width:180px">
+      <button type="button" class="btn" onclick="unlockManagerRecords()">Unlock Records</button>
+      <button type="button" class="btn secondary" onclick="lockManagerRecords()">Lock</button>
+    </div>
+
+    <div id="managerRecordsStats" class="manager-stats" style="display:none">
+      <div class="manager-stat"><span>Total</span><b id="mgrStatTotal">0</b></div>
+      <div class="manager-stat"><span>Pending</span><b id="mgrStatPending">0</b></div>
+      <div class="manager-stat"><span>Approved</span><b id="mgrStatApproved">0</b></div>
+      <div class="manager-stat"><span>Rejected</span><b id="mgrStatRejected">0</b></div>
+    </div>
+
+    <div id="managerRecordsFilters" class="manager-filters" style="display:none">
+      <input id="mgrSearch" placeholder="Search quotation no., customer or salesman" oninput="refreshManagerRecords()">
+      <select id="mgrSalesman" onchange="refreshManagerRecords()"><option value="">All salesmen</option></select>
+      <select id="mgrStatus" onchange="refreshManagerRecords()">
+        <option value="">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+      </select>
+      <input id="mgrDateFrom" type="date" onchange="refreshManagerRecords()" title="From date">
+      <input id="mgrDateTo" type="date" onchange="refreshManagerRecords()" title="To date">
+      <button type="button" class="btn secondary" onclick="document.getElementById('mgrSearch').value='';document.getElementById('mgrSalesman').value='';document.getElementById('mgrStatus').value='';document.getElementById('mgrDateFrom').value='';document.getElementById('mgrDateTo').value='';refreshManagerRecords()">Clear Filters</button>
+    </div>
+
+    <div id="managerRecordsTableWrap" class="manager-table-wrap" style="display:none">
+      <table class="manager-table">
+        <thead>
+          <tr>
+            <th>Quotation No.</th><th>Date</th><th>Customer</th><th>Salesman</th><th>Status</th><th>Items</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="managerRecordsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="grid">
     <div class="card editor">
       <h2>Quotation Entry</h2>
@@ -107,6 +156,7 @@
       </div>
 
       <div class="actions" style="justify-content:flex-end;margin-top:10px">
+        <button type="button" class="btn secondary" onclick="openManagerRecords()">Manager Quotation Records</button>
         <button type="button" class="btn secondary" onclick="toggleSalesmanSetup()">Manager Settings</button>
       </div>
       <h2 style="margin-top:8px">GM Approval</h2>
@@ -186,8 +236,6 @@
     </div>
   </div>
 </div>
-<script src="app-1.js"></script>
-<script src="app-2.js"></script>
-<script src="app-3.js"></script>
+<script src="app-central.js"></script>
 </body>
 </html>
