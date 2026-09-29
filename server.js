@@ -90,79 +90,88 @@ async function nextQuoteNo(client){
 }
 
 
+
+function parseGoogleBusinessCard(text){
+  const rawLines = String(text||"").split(/\r?\n/).map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
+  const unique = [...new Set(rawLines)];
+  const email = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)||[""])[0];
+  const website = (text.match(/(?:https?:\/\/|www\.)[^\s]+/i)||[""])[0];
+
+  const phoneCandidates = [...text.matchAll(/(?:\+?6?0?1\d[\s-]?\d{3,4}[\s-]?\d{4}|\+?6?0?\d{1,2}[\s-]?\d{3,4}[\s-]?\d{4})/g)]
+    .map(m=>m[0].trim()).filter((v,i,a)=>a.indexOf(v)===i);
+  const mobile = phoneCandidates.find(p=>/^(?:\+?6?0?)?1\d/.test(p.replace(/[\s-]/g,""))) || "";
+  const phone = phoneCandidates.find(p=>p!==mobile) || mobile || "";
+
+  const companyRegex = /\b(sdn\.?\s*bhd\.?|berhad|enterprise|trading|industr(?:y|ies)|manufactur(?:ing|er)|resources?|marketing|suppl(?:y|ies)|services?|engineering|technology|technologies|solutions?|holdings?|group|corporation|corp\.?|company|co\.?|ltd\.?|pte\.?\s*ltd\.?)\b/i;
+  const company = unique.find(l=>companyRegex.test(l)) || "";
+
+  const titleRegex = /\b(manager|director|executive|engineer|sales|marketing|business development|consultant|supervisor|officer|founder|owner|proprietor|general manager|managing director|purchasing|procurement|account|finance|operation|operations)\b/i;
+  const jobTitle = unique.find(l=>titleRegex.test(l) && !companyRegex.test(l)) || "";
+
+  const contactNoise = /(?:@|www\.|https?:|\b(?:tel|telephone|mobile|mob|hp|phone|fax|email|e-mail|website|web)\b|\+?6?0?1\d|\+?6?0?\d{1,2}[\s-]?\d{3,4}[\s-]?\d{4})/i;
+  const addressMarker = /\b(no\.?|lot|jalan|jln|lorong|lrng|persiaran|taman|bandar|kampung|kg\.?|industrial|industri|selangor|kuala lumpur|kl|johor|penang|pulau pinang|perak|kedah|melaka|malacca|sabah|sarawak|negeri sembilan|pahang|terengganu|kelantan|putrajaya|malaysia)\b|\b\d{5}\b/i;
+  let addressStart = unique.findIndex(l=>addressMarker.test(l) && !contactNoise.test(l));
+  let addressLines=[];
+  if(addressStart>=0){
+    for(let i=addressStart;i<unique.length && addressLines.length<5;i++){
+      const l=unique[i];
+      if(contactNoise.test(l) || l===company || l===jobTitle) break;
+      addressLines.push(l);
+      if(/malaysia/i.test(l)) break;
+    }
+  }
+  const address = addressLines.join(", ");
+
+  const excluded = new Set([company,jobTitle,...addressLines].filter(Boolean));
+  const personCandidates = unique.filter(l=>{
+    if(excluded.has(l)) return false;
+    if(contactNoise.test(l) || companyRegex.test(l) || addressMarker.test(l)) return false;
+    if(/\d/.test(l)) return false;
+    const words=l.split(/\s+/);
+    return words.length>=2 && words.length<=5 && l.length>=4 && l.length<=60;
+  });
+  const person = personCandidates[0] || "";
+
+  return {company,person,jobTitle,mobile,phone,email,website,address,rawText:String(text||"")};
+}
+
 app.get("/api/namecard/status",(req,res)=>{
   res.json({
-    configured: Boolean(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT && process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY),
-    endpointConfigured: Boolean(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT),
-    keyConfigured: Boolean(process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY)
+    provider:"google-vision",
+    configured:Boolean(process.env.GOOGLE_VISION_API_KEY),
+    keyConfigured:Boolean(process.env.GOOGLE_VISION_API_KEY)
   });
 });
 
 app.post("/api/namecard/scan", upload.single("image"), async (req,res)=>{
-  const endpoint = String(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT || "").replace(/\/$/,"");
-  const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY || "";
-  if(!endpoint || !key){
-    return res.status(503).json({error:"Name card scanner is not configured yet. Azure Document Intelligence credentials are missing."});
-  }
+  const key = process.env.GOOGLE_VISION_API_KEY || "";
+  if(!key) return res.status(503).json({error:"Google Vision OCR is not configured yet. GOOGLE_VISION_API_KEY is missing."});
   if(!req.file) return res.status(400).json({error:"Image is required"});
   try{
-    const analyzeUrl = `${endpoint}/formrecognizer/documentModels/prebuilt-businessCard:analyze?api-version=2023-07-31`;
-    const start = await fetch(analyzeUrl,{
+    const body={
+      requests:[{
+        image:{content:req.file.buffer.toString("base64")},
+        features:[{type:"DOCUMENT_TEXT_DETECTION"}],
+        imageContext:{languageHints:["en","ms","zh"]}
+      }]
+    };
+    const visionRes=await fetch("https://vision.googleapis.com/v1/images:annotate?key="+encodeURIComponent(key),{
       method:"POST",
-      headers:{
-        "Ocp-Apim-Subscription-Key":key,
-        "Content-Type":req.file.mimetype || "application/octet-stream"
-      },
-      body:req.file.buffer
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)
     });
-    if(!start.ok){
-      const msg = await start.text();
-      return res.status(502).json({error:"Azure name card analysis failed to start",details:msg.slice(0,500)});
+    const data=await visionRes.json().catch(()=>({}));
+    if(!visionRes.ok){
+      const msg=data?.error?.message || "Google Vision request failed";
+      return res.status(502).json({error:msg});
     }
-    const operationLocation = start.headers.get("operation-location");
-    if(!operationLocation) return res.status(502).json({error:"Azure did not return an analysis operation URL"});
-
-    let result=null;
-    for(let attempt=0; attempt<30; attempt++){
-      await new Promise(r=>setTimeout(r,700));
-      const poll = await fetch(operationLocation,{headers:{"Ocp-Apim-Subscription-Key":key}});
-      if(!poll.ok){
-        const msg=await poll.text();
-        return res.status(502).json({error:"Azure analysis polling failed",details:msg.slice(0,500)});
-      }
-      result=await poll.json();
-      if(result.status==="succeeded") break;
-      if(result.status==="failed") return res.status(422).json({error:"Azure could not read this name card",details:result.error||null});
-    }
-    if(!result || result.status!=="succeeded") return res.status(504).json({error:"Name card scan timed out. Please try again."});
-
-    const doc = result.analyzeResult?.documents?.[0];
-    const f = doc?.fields || {};
-    const str = field => field?.content || field?.valueString || "";
-    const firstArrayStr = field => {
-      const item = field?.valueArray?.[0];
-      return item?.content || item?.valueString || "";
-    };
-    const personField = f.ContactNames?.valueArray?.[0]?.valueObject || {};
-    const firstName = str(personField.FirstName);
-    const lastName = str(personField.LastName);
-    const fullName = [firstName,lastName].filter(Boolean).join(" ") || f.ContactNames?.valueArray?.[0]?.content || "";
-
-    const out = {
-      company:firstArrayStr(f.CompanyNames),
-      person:fullName,
-      jobTitle:firstArrayStr(f.JobTitles),
-      mobile:firstArrayStr(f.MobilePhones),
-      phone:firstArrayStr(f.WorkPhones) || firstArrayStr(f.MobilePhones),
-      fax:firstArrayStr(f.Faxes),
-      email:firstArrayStr(f.Emails),
-      website:firstArrayStr(f.Websites),
-      address:firstArrayStr(f.Addresses),
-      confidence: doc?.confidence ?? null
-    };
-    res.json(out);
+    const result=data?.responses?.[0] || {};
+    if(result.error) return res.status(422).json({error:result.error.message || "Google Vision could not read this name card"});
+    const text=result.fullTextAnnotation?.text || result.textAnnotations?.[0]?.description || "";
+    if(!text.trim()) return res.status(422).json({error:"No readable text was detected. Try a clearer, straighter photo with less glare."});
+    res.json(parseGoogleBusinessCard(text));
   }catch(e){
-    console.error("Name card scan error",e);
+    console.error("Google Vision name card scan error",e);
     res.status(500).json({error:"Name card scan failed",details:e.message});
   }
 });
