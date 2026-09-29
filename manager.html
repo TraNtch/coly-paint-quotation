@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coly Paint Manager Approval</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="app-logo-wrap"><img class="app-logo" src="logo.png" alt="Coly Paint"></div>
+      <div>
+        <h1>Coly Paint Manager Approval</h1>
+        <small>Manager-only quotation records, approval and salesman setup</small>
+      </div>
+    </div>
+    <a class="btn secondary" href="index.html" style="text-decoration:none">Sales Quotation Page</a>
+  </div>
+
+  <div class="card manager-records-page">
+    <div class="manager-records-head">
+      <div>
+        <h2 style="margin:0">Manager Access</h2>
+        <div class="small">Enter the manager PIN once to unlock quotation records and approval actions.</div>
+      </div>
+    </div>
+    <div class="manager-unlock">
+      <input id="managerRecordsPin" type="password" placeholder="Manager PIN" style="max-width:180px">
+      <button type="button" class="btn" onclick="unlockManager()">Unlock</button>
+      <button type="button" class="btn secondary" onclick="lockManager()">Lock</button>
+    </div>
+  </div>
+
+  <div id="managerContent" style="display:none">
+    <div class="card manager-records-page">
+      <div class="manager-records-head">
+        <div>
+          <h2 style="margin:0">Quotation Records & Approval</h2>
+          <div class="small">Search all quotation records and approve or reject pending quotations.</div>
+        </div>
+        <button type="button" class="btn secondary" onclick="refreshManagerRecords()">Refresh</button>
+      </div>
+
+      <div id="managerRecordsStats" class="manager-stats">
+        <div class="manager-stat"><span>Total</span><b id="mgrStatTotal">0</b></div>
+        <div class="manager-stat"><span>Pending</span><b id="mgrStatPending">0</b></div>
+        <div class="manager-stat"><span>Approved</span><b id="mgrStatApproved">0</b></div>
+        <div class="manager-stat"><span>Rejected</span><b id="mgrStatRejected">0</b></div>
+      </div>
+
+      <div id="managerRecordsFilters" class="manager-filters">
+        <input id="mgrSearch" placeholder="Search quotation no., customer or salesman" oninput="refreshManagerRecords()">
+        <select id="mgrSalesman" onchange="refreshManagerRecords()"><option value="">All salesmen</option></select>
+        <select id="mgrStatus" onchange="refreshManagerRecords()">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <input id="mgrDateFrom" type="date" onchange="refreshManagerRecords()" title="From date">
+        <input id="mgrDateTo" type="date" onchange="refreshManagerRecords()" title="To date">
+        <button type="button" class="btn secondary" onclick="clearManagerFilters()">Clear Filters</button>
+      </div>
+
+      <div class="manager-table-wrap">
+        <table class="manager-table">
+          <thead>
+            <tr>
+              <th>Quotation No.</th><th>Date</th><th>Customer</th><th>Salesman</th><th>Status</th><th>Items</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="managerRecordsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="managerQuoteDetail" class="card manager-records-page" style="display:none"></div>
+
+    <div class="card manager-records-page">
+      <div class="manager-records-head">
+        <div>
+          <h2 style="margin:0">Salesman Setup</h2>
+          <div class="small">Create salesmen, assign PINs, reset PINs or disable a salesman.</div>
+        </div>
+      </div>
+
+      <div class="scanrow">
+        <input id="newSalesmanName" placeholder="New salesman name" style="max-width:220px">
+        <input id="newSalesmanPin" type="password" inputmode="numeric" placeholder="Salesman PIN" style="max-width:150px">
+        <button class="btn" type="button" onclick="addSalesman()">Add Salesman</button>
+      </div>
+      <div id="salesmanList" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+<script src="manager.js"></script>
+</body>
+</html>
