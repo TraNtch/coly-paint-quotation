@@ -264,35 +264,49 @@ function resetAllInputs(){
 
 $("namecardInput").addEventListener("change", async e=>{
   const file=e.target.files?.[0]; if(!file)return;
-  $("namecardImage").src=URL.createObjectURL(file); $("scanPreview").style.display="block"; $("scanResult").style.display="none";
-  $("scanStatus").textContent="Reading name card…";
+  $("namecardImage").src=URL.createObjectURL(file);
+  $("scanPreview").style.display="block";
+  $("scanResult").style.display="none";
+  $("scanStatus").textContent="Scanning name card with cloud document recognition…";
   try{
-    if(!window.Tesseract) throw new Error("OCR library could not be loaded.");
-    const result=await Tesseract.recognize(file,"eng",{logger:m=>{if(m.status)$("scanStatus").textContent=m.status+(m.progress?` ${Math.round(m.progress*100)}%`:"")}});
-    parseNamecard(result.data.text||""); $("scanResult").style.display="block"; $("scanStatus").textContent="Name card read. Please review the extracted fields.";
-  }catch(err){$("scanStatus").textContent="Could not read the name card: "+err.message}
+    const form=new FormData();
+    form.append("image",file);
+    const res=await fetch(API_BASE+"/namecard/scan",{method:"POST",body:form});
+    let data={}; try{data=await res.json()}catch(_){}
+    if(!res.ok) throw new Error(data.error || "Name card scan failed");
+    $("scanCompany").value=data.company||"";
+    $("scanPerson").value=data.person||"";
+    $("scanPhone").value=data.mobile||data.phone||"";
+    $("scanEmail").value=data.email||"";
+    $("scanAddress").value=data.address||"";
+    $("scanResult").style.display="block";
+    const extras=[
+      data.jobTitle ? "Title: "+data.jobTitle : "",
+      data.website ? "Website: "+data.website : "",
+      data.fax ? "Fax: "+data.fax : ""
+    ].filter(Boolean).join(" · ");
+    $("scanStatus").textContent="Name card scanned. Review the extracted fields before using them."+(extras?" "+extras:"");
+  }catch(err){
+    $("scanStatus").textContent="Could not scan the name card: "+err.message;
+  }
 });
-function parseNamecard(text){
-  const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  const email=(text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)||[""])[0];
-  const phones=[...text.matchAll(/(?:\+?\d[\d\s\-().]{7,}\d)/g)].map(m=>m[0].trim());
-  const companyKeywords=/\b(sdn\.?\s*bhd\.?|berhad|enterprise|trading|industries|manufacturing|company|co\.?|ltd\.?|pte\.?\s*ltd\.?)\b/i;
-  let company=lines.find(l=>companyKeywords.test(l))||lines[0]||"";
-  const noise=/(www\.|http|tel|fax|mobile|email|address|jalan|jln|lorong|taman|selangor|kuala lumpur|malaysia|\d{5})/i;
-  let person=lines.find(l=>!noise.test(l)&&!companyKeywords.test(l)&&l.length>2&&l.length<45)||"";
-  const address=lines.filter(l=>/jalan|jln|lorong|persiaran|taman|industrial|selangor|kuala lumpur|malaysia|\b\d{5}\b/i.test(l)).join(", ");
-  $("scanCompany").value=company; $("scanPerson").value=person; $("scanPhone").value=phones[0]||""; $("scanEmail").value=email; $("scanAddress").value=address;
-}
+
 function applyScannedCustomer(){
-  $("customer").value=$("scanCompany").value; $("attention").value=$("scanPerson").value; $("phone").value=$("scanPhone").value;
-  $("email").value=$("scanEmail").value; $("address").value=$("scanAddress").value; render();
+  $("customer").value=$("scanCompany").value;
+  $("attention").value=$("scanPerson").value;
+  $("phone").value=$("scanPhone").value;
+  $("email").value=$("scanEmail").value;
+  $("address").value=$("scanAddress").value;
+  render();
+  $("scanStatus").textContent="Customer details applied to quotation.";
 }
 function clearNamecard(){
-  $("namecardInput").value=""; $("scanPreview").style.display="none"; $("scanResult").style.display="none";
-  $("scanStatus").textContent="Take a clear photo of the business card. OCR will extract the contact details.";
+  $("namecardInput").value="";
+  $("scanPreview").style.display="none";
+  $("scanResult").style.display="none";
+  $("scanStatus").textContent="Take or upload a clear photo of the business card. Cloud scanning will extract the contact details.";
   ["scanCompany","scanPerson","scanPhone","scanEmail","scanAddress"].forEach(id=>$(id).value="");
 }
-
 async function init(){
   $("quoteDate").value=new Date().toISOString().slice(0,10);
   watch.forEach(id=>$(id).addEventListener("input",()=>{ if(id!=="salesmanName"){state.approved=false;if(state.currentStatus==="approved"){state.currentQuoteId=null;state.currentQuoteNo="";}state.currentStatus="draft";setStatus();render();}}));
