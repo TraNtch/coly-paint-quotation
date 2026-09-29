@@ -299,4 +299,121 @@ async function init(){
   $("salesmanName").addEventListener("change",()=>{state.approved=false;state.currentQuoteId=null;state.currentQuoteNo="";state.currentStatus="draft";setStatus();render();lockQuoteHistory();});
   await loadSalesmen(); addItem(); setStatus(); render(); lockQuoteHistory();
 }
+
+let managerRecordsUnlocked=false;
+let managerRecordsPin="";
+
+function openManagerRecords(){
+  const panel=$("managerRecordsPage");
+  if(!panel) return;
+  panel.style.display="block";
+  panel.scrollIntoView({behavior:"smooth",block:"start"});
+  if(managerRecordsUnlocked) refreshManagerRecords();
+}
+function closeManagerRecords(){
+  const panel=$("managerRecordsPage");
+  if(panel) panel.style.display="none";
+}
+async function unlockManagerRecords(){
+  const pin=$("managerRecordsPin").value;
+  if(!pin){alert("Enter manager PIN.");return}
+  managerRecordsPin=pin;
+  try{
+    managerRecordsUnlocked=true;
+    $("managerRecordsFilters").style.display="grid";
+    $("managerRecordsStats").style.display="grid";
+    $("managerRecordsTableWrap").style.display="block";
+    await refreshManagerRecords();
+  }catch(e){
+    managerRecordsUnlocked=false;
+    $("managerRecordsFilters").style.display="none";
+    $("managerRecordsStats").style.display="none";
+    $("managerRecordsTableWrap").style.display="none";
+    alert(e.message);
+  }
+}
+function lockManagerRecords(){
+  managerRecordsUnlocked=false; managerRecordsPin="";
+  if($("managerRecordsPin"))$("managerRecordsPin").value="";
+  if($("managerRecordsFilters"))$("managerRecordsFilters").style.display="none";
+  if($("managerRecordsStats"))$("managerRecordsStats").style.display="none";
+  if($("managerRecordsTableWrap"))$("managerRecordsTableWrap").style.display="none";
+  if($("managerRecordsBody"))$("managerRecordsBody").innerHTML="";
+}
+async function refreshManagerRecords(){
+  if(!managerRecordsUnlocked) return;
+  const payload={
+    managerPin:managerRecordsPin,
+    query:$("mgrSearch")?.value||"",
+    status:$("mgrStatus")?.value||"",
+    salesmanId:$("mgrSalesman")?.value||"",
+    dateFrom:$("mgrDateFrom")?.value||"",
+    dateTo:$("mgrDateTo")?.value||""
+  };
+  const data=await api("/manager/quotes/search",{method:"POST",body:JSON.stringify(payload)});
+  const stats=data.stats||{};
+  $("mgrStatTotal").textContent=stats.total??0;
+  $("mgrStatPending").textContent=stats.pending??0;
+  $("mgrStatApproved").textContent=stats.approved??0;
+  $("mgrStatRejected").textContent=stats.rejected??0;
+  const body=$("managerRecordsBody"); body.innerHTML="";
+  if(!data.quotes.length){
+    body.innerHTML='<tr><td colspan="7" class="small">No quotations match the selected filters.</td></tr>';
+    return;
+  }
+  data.quotes.forEach(r=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td><b>${esc(r.quote_no)}</b></td>
+      <td>${esc(fmtDate(String(r.quote_date).slice(0,10)))}</td>
+      <td>${esc(r.customer)}</td>
+      <td>${esc(r.salesman)}</td>
+      <td><span class="mgr-status mgr-${esc(r.status)}">${esc(r.status.toUpperCase())}</span></td>
+      <td>${(r.items||[]).length}</td>
+      <td><div class="mgr-actions">
+        <button class="btn secondary" type="button">View</button>
+        ${r.status!=="approved"?'<button class="btn success" type="button" data-action="approve">Approve</button>':""}
+        ${r.status!=="rejected"?'<button class="btn secondary" type="button" data-action="reject">Reject</button>':""}
+      </div></td>`;
+    tr.querySelector(".btn.secondary").onclick=()=>loadManagerQuote(r);
+    const approveBtn=tr.querySelector('[data-action="approve"]');
+    if(approveBtn) approveBtn.onclick=()=>managerRecordApprove(r.id);
+    const rejectBtn=tr.querySelector('[data-action="reject"]');
+    if(rejectBtn) rejectBtn.onclick=()=>managerRecordReject(r.id);
+    body.appendChild(tr);
+  });
+}
+function loadManagerQuote(r){
+  closeManagerRecords();
+  state.currentQuoteId=r.id; state.currentQuoteNo=r.quote_no; state.currentStatus=r.status; state.approved=r.status==="approved";
+  $("salesmanName").value=String(r.salesman_id);
+  $("quoteDate").value=String(r.quote_date).slice(0,10);
+  $("customer").value=r.customer||""; $("attention").value=r.attention||""; $("phone").value=r.phone||"";
+  $("email").value=r.email||""; $("address").value=r.address||""; $("payment").value=r.payment||"30 days";
+  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price)}));
+  if(!(r.items||[]).length)addItem();
+  setStatus(); render();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+async function managerRecordApprove(id){
+  try{
+    await api(`/manager/quotes/${id}/approve`,{method:"POST",body:JSON.stringify({managerPin:managerRecordsPin})});
+    await refreshManagerRecords();
+  }catch(e){alert(e.message)}
+}
+async function managerRecordReject(id){
+  if(!confirm("Reject / return this quotation to the salesman?")) return;
+  try{
+    await api(`/manager/quotes/${id}/reject`,{method:"POST",body:JSON.stringify({managerPin:managerRecordsPin})});
+    await refreshManagerRecords();
+  }catch(e){alert(e.message)}
+}
+async function populateManagerSalesmen(){
+  const list=await api("/salesmen");
+  const sel=$("mgrSalesman");
+  if(!sel) return;
+  sel.innerHTML='<option value="">All salesmen</option>';
+  list.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
+}
+
 init();
