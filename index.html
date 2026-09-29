@@ -21,7 +21,7 @@
       <h2>Quotation Entry</h2>
 
       <div class="scanbox">
-        <h3>Scan Customer Name Card — Cloud OCR</h3>
+        <h3>Scan Customer Name Card — Google Vision OCR</h3>
         <div class="scanrow">
           <label style="margin:0">
             <input id="namecardInput" type="file" accept="image/*" capture="environment" style="display:none">
@@ -29,7 +29,7 @@
           </label>
           <button class="btn secondary" type="button" onclick="clearNamecard()">Clear</button>
         </div>
-        <div class="scanstatus" id="scanStatus">Take or upload a clear photo of the business card. Cloud scanning will extract the contact details.</div>
+        <div class="scanstatus" id="scanStatus">Take or upload a clear photo of the business card. Google Vision OCR will extract the contact details.</div>
         <div class="scanpreview" id="scanPreview"><img id="namecardImage" alt="Name card preview"></div>
         <div class="scanresult" id="scanResult">
           <div class="small">Please confirm the extracted information before applying it to the quotation.</div>
