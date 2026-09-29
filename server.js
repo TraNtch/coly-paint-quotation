@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -86,6 +88,76 @@ async function nextQuoteNo(client){
   `,[yy]);
   return `QT/${String(yy).padStart(2,"0")}/${String(r.rows[0].last_number).padStart(3,"0")}`;
 }
+
+
+app.post("/api/namecard/scan", upload.single("image"), async (req,res)=>{
+  const endpoint = String(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT || "").replace(/\/$/,"");
+  const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY || "";
+  if(!endpoint || !key){
+    return res.status(503).json({error:"Name card scanner is not configured yet. Azure Document Intelligence credentials are missing."});
+  }
+  if(!req.file) return res.status(400).json({error:"Image is required"});
+  try{
+    const analyzeUrl = `${endpoint}/formrecognizer/documentModels/prebuilt-businessCard:analyze?api-version=2023-07-31`;
+    const start = await fetch(analyzeUrl,{
+      method:"POST",
+      headers:{
+        "Ocp-Apim-Subscription-Key":key,
+        "Content-Type":req.file.mimetype || "application/octet-stream"
+      },
+      body:req.file.buffer
+    });
+    if(!start.ok){
+      const msg = await start.text();
+      return res.status(502).json({error:"Azure name card analysis failed to start",details:msg.slice(0,500)});
+    }
+    const operationLocation = start.headers.get("operation-location");
+    if(!operationLocation) return res.status(502).json({error:"Azure did not return an analysis operation URL"});
+
+    let result=null;
+    for(let attempt=0; attempt<30; attempt++){
+      await new Promise(r=>setTimeout(r,700));
+      const poll = await fetch(operationLocation,{headers:{"Ocp-Apim-Subscription-Key":key}});
+      if(!poll.ok){
+        const msg=await poll.text();
+        return res.status(502).json({error:"Azure analysis polling failed",details:msg.slice(0,500)});
+      }
+      result=await poll.json();
+      if(result.status==="succeeded") break;
+      if(result.status==="failed") return res.status(422).json({error:"Azure could not read this name card",details:result.error||null});
+    }
+    if(!result || result.status!=="succeeded") return res.status(504).json({error:"Name card scan timed out. Please try again."});
+
+    const doc = result.analyzeResult?.documents?.[0];
+    const f = doc?.fields || {};
+    const str = field => field?.content || field?.valueString || "";
+    const firstArrayStr = field => {
+      const item = field?.valueArray?.[0];
+      return item?.content || item?.valueString || "";
+    };
+    const personField = f.ContactNames?.valueArray?.[0]?.valueObject || {};
+    const firstName = str(personField.FirstName);
+    const lastName = str(personField.LastName);
+    const fullName = [firstName,lastName].filter(Boolean).join(" ") || f.ContactNames?.valueArray?.[0]?.content || "";
+
+    const out = {
+      company:firstArrayStr(f.CompanyNames),
+      person:fullName,
+      jobTitle:firstArrayStr(f.JobTitles),
+      mobile:firstArrayStr(f.MobilePhones),
+      phone:firstArrayStr(f.WorkPhones) || firstArrayStr(f.MobilePhones),
+      fax:firstArrayStr(f.Faxes),
+      email:firstArrayStr(f.Emails),
+      website:firstArrayStr(f.Websites),
+      address:firstArrayStr(f.Addresses),
+      confidence: doc?.confidence ?? null
+    };
+    res.json(out);
+  }catch(e){
+    console.error("Name card scan error",e);
+    res.status(500).json({error:"Name card scan failed",details:e.message});
+  }
+});
 
 app.get("/api/health", async (req,res)=>{
   if(!pool) return res.status(503).json({ok:false,database:false});
