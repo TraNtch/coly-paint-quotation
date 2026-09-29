@@ -204,6 +204,53 @@ app.post("/api/manager/quotes/:id/reject", requireDb, async (req,res)=>{
   res.json(r.rows[0]);
 });
 
+
+app.post("/api/manager/quotes/search", requireDb, async (req,res)=>{
+  const {managerPin:pin,query,status,salesmanId,dateFrom,dateTo} = req.body || {};
+  if(!managerOk(pin)) return res.status(401).json({error:"Incorrect manager PIN"});
+  const vals=[];
+  const where=[];
+  if(String(query||"").trim()){
+    vals.push(`%${String(query).trim()}%`);
+    where.push(`(q.quote_no ILIKE ${vals.length} OR q.customer ILIKE ${vals.length} OR s.name ILIKE ${vals.length})`);
+  }
+  if(status && ["pending","approved","rejected"].includes(status)){
+    vals.push(status); where.push(`q.status=${vals.length}`);
+  }
+  if(salesmanId){
+    vals.push(Number(salesmanId)); where.push(`q.salesman_id=${vals.length}`);
+  }
+  if(dateFrom){
+    vals.push(dateFrom); where.push(`q.quote_date >= ${vals.length}`);
+  }
+  if(dateTo){
+    vals.push(dateTo); where.push(`q.quote_date <= ${vals.length}`);
+  }
+  const clause = where.length ? "WHERE "+where.join(" AND ") : "";
+  const rows = await pool.query(`
+    SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.status,
+           q.approved_at,q.created_at,q.updated_at,q.salesman_id,s.name AS salesman,
+      COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'position',i.position)
+        ORDER BY i.position) FILTER (WHERE i.id IS NOT NULL),'[]'::json) AS items
+    FROM quotes q
+    JOIN salesmen s ON s.id=q.salesman_id
+    LEFT JOIN quote_items i ON i.quote_id=q.id
+    ${clause}
+    GROUP BY q.id,s.name
+    ORDER BY q.created_at DESC
+    LIMIT 500
+  `, vals);
+  const stats = await pool.query(`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE status='pending')::int AS pending,
+      COUNT(*) FILTER (WHERE status='approved')::int AS approved,
+      COUNT(*) FILTER (WHERE status='rejected')::int AS rejected
+    FROM quotes
+  `);
+  res.json({quotes:rows.rows,stats:stats.rows[0]});
+});
+
 app.post("/api/salesmen/history", requireDb, async (req,res)=>{
   const {salesmanId,pin,query} = req.body || {};
   const salesman = await verifySalesman(salesmanId,pin);
