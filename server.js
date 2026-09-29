@@ -90,6 +90,14 @@ async function nextQuoteNo(client){
 }
 
 
+app.get("/api/namecard/status",(req,res)=>{
+  res.json({
+    configured: Boolean(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT && process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY),
+    endpointConfigured: Boolean(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT),
+    keyConfigured: Boolean(process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY)
+  });
+});
+
 app.post("/api/namecard/scan", upload.single("image"), async (req,res)=>{
   const endpoint = String(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT || "").replace(/\/$/,"");
   const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY || "";
