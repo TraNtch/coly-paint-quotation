@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Coly Paint Quotation Approval Tool</title>
 <link rel="stylesheet" href="styles.css">
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -22,7 +21,7 @@
       <h2>Quotation Entry</h2>
 
       <div class="scanbox">
-        <h3>Scan Customer Name Card</h3>
+        <h3>Scan Customer Name Card — Cloud OCR</h3>
         <div class="scanrow">
           <label style="margin:0">
             <input id="namecardInput" type="file" accept="image/*" capture="environment" style="display:none">
@@ -30,7 +29,7 @@
           </label>
           <button class="btn secondary" type="button" onclick="clearNamecard()">Clear</button>
         </div>
-        <div class="scanstatus" id="scanStatus">Take a clear photo of the business card. OCR will extract the contact details.</div>
+        <div class="scanstatus" id="scanStatus">Take or upload a clear photo of the business card. Cloud scanning will extract the contact details.</div>
         <div class="scanpreview" id="scanPreview"><img id="namecardImage" alt="Name card preview"></div>
         <div class="scanresult" id="scanResult">
           <div class="small">Please confirm the extracted information before applying it to the quotation.</div>
