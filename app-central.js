@@ -267,7 +267,7 @@ $("namecardInput").addEventListener("change", async e=>{
   $("namecardImage").src=URL.createObjectURL(file);
   $("scanPreview").style.display="block";
   $("scanResult").style.display="none";
-  $("scanStatus").textContent="Scanning name card with cloud document recognition…";
+  $("scanStatus").textContent="Scanning name card with Google Vision OCR…";
   try{
     const form=new FormData();
     form.append("image",file);
