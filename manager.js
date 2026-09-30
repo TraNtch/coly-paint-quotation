@@ -63,10 +63,12 @@ async function refreshManagerRecords(){
         <button class="btn secondary" type="button" data-action="view">View</button>
         ${r.status!=="approved"?'<button class="btn success" type="button" data-action="approve">Approve</button>':""}
         ${r.status!=="rejected"?'<button class="btn secondary" type="button" data-action="reject">Reject</button>':""}
+        <button class="btn danger" type="button" data-action="delete">Delete</button>
       </div></td>`;
     tr.querySelector('[data-action="view"]').onclick=()=>showQuoteDetail(r);
     const a=tr.querySelector('[data-action="approve"]');if(a)a.onclick=()=>approveQuote(r.id);
     const j=tr.querySelector('[data-action="reject"]');if(j)j.onclick=()=>rejectQuote(r.id);
+    const d=tr.querySelector('[data-action="delete"]');if(d)d.onclick=()=>deleteQuote(r.id,r.quote_no,r.customer);
     body.appendChild(tr);
   });
 }
@@ -94,6 +96,7 @@ function showQuoteDetail(r){
     <div class="actions">
       ${r.status!=="approved"?`<button class="btn success" onclick="approveQuote(${r.id})">Approve Quotation</button>`:""}
       ${r.status!=="rejected"?`<button class="btn secondary" onclick="rejectQuote(${r.id})">Reject / Return</button>`:""}
+      <button class="btn danger" onclick="deleteQuote(${r.id},'${escAttr(r.quote_no)}','${escAttr(r.customer)}')">Delete Quotation</button>
     </div>`;
   box.scrollIntoView({behavior:"smooth",block:"start"});
 }
@@ -104,6 +107,16 @@ async function approveQuote(id){
 async function rejectQuote(id){
   if(!confirm("Reject / return this quotation to the salesman?"))return;
   try{await api(`/manager/quotes/${id}/reject`,{method:"POST",body:JSON.stringify({managerPin})});$("managerQuoteDetail").style.display="none";await refreshManagerRecords()}catch(e){alert(e.message)}
+}
+
+async function deleteQuote(id,quoteNo,customer){
+  const label=[quoteNo,customer].filter(Boolean).join(" — ");
+  if(!confirm(`Permanently delete ${label || "this quotation"}?\n\nThis cannot be undone.`))return;
+  try{
+    await api(`/manager/quotes/${id}`,{method:"DELETE",body:JSON.stringify({managerPin})});
+    $("managerQuoteDetail").style.display="none";
+    await refreshManagerRecords();
+  }catch(e){alert(e.message)}
 }
 function clearManagerFilters(){
   ["mgrSearch","mgrSalesman","mgrStatus","mgrDateFrom","mgrDateTo"].forEach(id=>{const el=$(id);if(el)el.value=""});
