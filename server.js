@@ -294,6 +294,17 @@ app.post("/api/manager/quotes/:id/reject", requireDb, async (req,res)=>{
 });
 
 
+app.delete("/api/manager/quotes/:id", requireDb, async (req,res)=>{
+  if(!managerOk(req.body?.managerPin)) return res.status(401).json({error:"Incorrect manager PIN"});
+  const r=await pool.query(
+    "DELETE FROM quotes WHERE id=$1 RETURNING id,quote_no,customer,status",
+    [req.params.id]
+  );
+  if(!r.rowCount) return res.status(404).json({error:"Quote not found"});
+  res.json({ok:true,deleted:r.rows[0]});
+});
+
+
 app.post("/api/manager/quotes/search", requireDb, async (req,res)=>{
   const {managerPin:pin,query,status,salesmanId,dateFrom,dateTo} = req.body || {};
   if(!managerOk(pin)) return res.status(401).json({error:"Incorrect manager PIN"});
