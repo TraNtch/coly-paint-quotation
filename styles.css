@@ -298,3 +298,254 @@ th{font-size:12px;color:#4b5563}
   .manager-filters{grid-template-columns:1fr}
   .manager-filters input:first-child{grid-column:auto}
 }
+
+
+/* === Quotation layout stabilization === */
+.grid{align-items:start}
+.editor,.quote-preview{min-width:0}
+.quote-preview{overflow:hidden}
+.quote-preview>h2{margin-bottom:10px}
+
+/* Screen preview: clean A4-like sheet */
+.paper{
+  width:100%;
+  max-width:794px;
+  margin:0 auto;
+  min-height:1030px;
+  padding:26px 30px 34px;
+  overflow:hidden;
+  background:#fff;
+  border:1px solid #d6d6d6;
+  border-radius:2px;
+  box-shadow:0 1px 4px rgba(0,0,0,.08);
+  font-family:Arial,Helvetica,sans-serif;
+  color:#111;
+}
+
+/* Letterhead */
+.coly-letterhead{
+  display:block;
+  margin:0 0 18px;
+  padding:0;
+}
+.letterhead-main{
+  display:grid;
+  grid-template-columns:150px minmax(0,1fr);
+  gap:18px;
+  align-items:center;
+  width:100%;
+  min-height:84px;
+}
+.letterhead-logo{
+  display:block;
+  width:145px;
+  max-width:100%;
+  height:auto;
+  object-fit:contain;
+  margin:0;
+}
+.letterhead-text{
+  min-width:0;
+  text-align:right;
+  line-height:1.25;
+  margin:0;
+}
+.letterhead-text .company-name{
+  margin:0 0 2px;
+  font-size:22px;
+  line-height:1.05;
+  font-weight:700;
+  white-space:normal;
+}
+.company-reg{font-size:10px;margin:0 0 3px}
+.company-address{
+  font-size:10.5px;
+  line-height:1.3;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.company-contact{font-size:10.5px;margin-top:2px}
+.letterhead-rule{
+  width:100%;
+  margin:8px 0 0;
+  border-top:1.5px solid #222;
+}
+
+/* Customer / quotation metadata */
+.quote-top{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 205px;
+  gap:24px;
+  min-height:128px;
+  margin:0 0 14px;
+  padding:0;
+  align-items:start;
+}
+.customer-block,.quote-meta{
+  min-width:0;
+  font-size:12px;
+  line-height:1.42;
+}
+.customer-block{
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.customer-name{
+  margin:3px 0 1px;
+  font-weight:700;
+  font-size:12.5px;
+}
+.quote-meta{text-align:left}
+.quote-word{
+  margin:0 0 7px;
+  font-size:18px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.35px;
+}
+
+/* Quotation table */
+.coly-table{
+  width:100%;
+  table-layout:fixed;
+  border-collapse:collapse;
+  margin:0;
+  font-size:11px;
+}
+.coly-table th{
+  height:28px;
+  padding:5px 4px;
+  border:1px solid #222;
+  background:#f7f7f7;
+  text-align:center;
+  vertical-align:middle;
+  font-size:10.5px;
+  line-height:1.15;
+  font-weight:700;
+}
+.coly-table td{
+  height:27px;
+  padding:5px 6px;
+  border:1px solid #222;
+  vertical-align:top;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+.coly-table td:nth-child(1),
+.coly-table td:nth-child(3),
+.coly-table td:nth-child(4),
+.coly-table td:nth-child(5){text-align:center}
+.coly-table td:nth-child(5){white-space:nowrap}
+
+/* Terms / footer */
+.coly-terms{
+  margin-top:18px;
+  font-size:11.5px;
+  line-height:1.45;
+}
+.coly-terms>div{margin-bottom:2px}
+
+/* Keep the editor table usable without distorting the whole page */
+.editor{overflow:hidden}
+.editor>table{width:100%;table-layout:fixed}
+.editor #itemRows td{overflow:hidden}
+.editor #itemRows input{min-width:0;width:100%}
+.editor #itemRows .desc-wrap{min-width:0}
+.editor #itemRows .desc-actions{flex-shrink:0}
+
+/* Better responsive behavior */
+@media(max-width:1050px){
+  .grid{grid-template-columns:1fr}
+  .quote-preview{order:2}
+  .paper{max-width:760px}
+}
+@media(max-width:700px){
+  .topbar{align-items:flex-start;gap:8px;flex-direction:column}
+  .brand{width:100%}
+  .status{align-self:flex-start}
+  .paper{
+    min-height:0;
+    padding:18px 14px 24px;
+    box-shadow:none;
+  }
+  .letterhead-main{
+    grid-template-columns:105px minmax(0,1fr);
+    gap:10px;
+    min-height:70px;
+  }
+  .letterhead-logo{width:100px}
+  .letterhead-text .company-name{font-size:17px}
+  .company-reg{font-size:8.5px}
+  .company-address,.company-contact{font-size:9px}
+  .quote-top{
+    grid-template-columns:1fr;
+    gap:12px;
+    min-height:0;
+  }
+  .quote-meta{
+    padding:10px 0 0;
+    border-top:1px solid #ddd;
+  }
+  .coly-table{font-size:9px}
+  .coly-table th{font-size:8.5px;padding:4px 2px}
+  .coly-table td{padding:4px 3px}
+  .coly-terms{font-size:10px}
+  .editor table th{font-size:9px;padding:5px 2px}
+  .editor #itemRows input{font-size:11px;padding:5px 3px}
+  .editor #itemRows .variant-inline{padding:4px 3px;font-size:9px}
+  .editor #itemRows .remove-inline{padding:5px 4px;font-size:12px}
+}
+@media(max-width:460px){
+  .app{padding:7px}
+  .card{padding:9px}
+  .paper{padding:14px 8px 20px}
+  .letterhead-main{grid-template-columns:88px minmax(0,1fr);gap:7px}
+  .letterhead-logo{width:84px}
+  .letterhead-text .company-name{font-size:15px}
+  .company-address,.company-contact{font-size:8px}
+  .quote-word{font-size:15px}
+  .customer-block,.quote-meta{font-size:10px}
+  .coly-table th{font-size:7.6px}
+  .coly-table td{font-size:8px}
+}
+
+/* Print / PDF: true A4 proportions and no UI chrome */
+@media print{
+  html,body{width:210mm;background:#fff!important}
+  body{margin:0!important}
+  .app{max-width:none!important;margin:0!important;padding:0!important}
+  .app>.topbar,.editor,.no-print{display:none!important}
+  .grid{display:block!important}
+  .quote-preview{
+    width:100%!important;
+    margin:0!important;
+    padding:0!important;
+    box-shadow:none!important;
+    border:0!important;
+    overflow:visible!important;
+  }
+  .paper{
+    width:190mm!important;
+    max-width:none!important;
+    min-height:277mm!important;
+    margin:0 auto!important;
+    padding:8mm 9mm 10mm!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    overflow:visible!important;
+  }
+  .letterhead-main{grid-template-columns:38mm minmax(0,1fr);gap:5mm}
+  .letterhead-logo{width:36mm}
+  .letterhead-text .company-name{font-size:17pt}
+  .company-reg{font-size:7.5pt}
+  .company-address,.company-contact{font-size:8pt}
+  .quote-top{grid-template-columns:minmax(0,1fr) 52mm;gap:7mm;min-height:31mm}
+  .customer-block,.quote-meta{font-size:9pt}
+  .quote-word{font-size:14pt}
+  .coly-table{font-size:8.5pt}
+  .coly-table th{font-size:8pt;height:7mm;padding:1.4mm 1mm}
+  .coly-table td{height:7mm;padding:1.4mm 1.4mm}
+  .coly-terms{font-size:8.5pt}
+  @page{size:A4 portrait;margin:10mm}
+}
