@@ -1,28 +1,34 @@
 # Coly Paint quotation app
 
-Each quotation item has an optional multiline **REMARK** field for delivery MOQ
-and other notes (up to 1,000 characters). Remarks are saved with the item, returned
-by manager search and salesman history, and shown in the quotation preview,
-manager item details, and printed quotation. Adding a packing variant copies the
-remark; it can then be edited independently. Editing an approved quotation's
-remark creates a draft requiring approval again.
+Each quotation has one optional multiline **REMARK** field below its items table
+for delivery MOQ and other overall notes (up to 10,000 characters). It is saved
+with the quotation, returned by manager search and salesman history, and shown
+below the table in the preview, manager details, and printed quotation.
+Editing an approved quotation's remark creates a draft requiring approval again.
 
-## Database migration
+## Database migrations
 
-The API runs `migrations/001_item_remark.sql` during startup before accepting
-requests. It adds `quote_items.remark` with a blank default and preserves existing
-items. The migration can be run repeatedly. Older clients can omit the field, and
-older records load with blank remarks. If database initialization fails, startup
-fails so Render does not deploy an API with an incomplete schema.
+The API runs the migrations during startup before accepting requests.
+`001_item_remark.sql` retains the previous item field for older clients.
+`002_quotation_remark.sql` adds `quotes.remark` and combines existing item notes
+in item order, deduplicating identical notes. Original item records are preserved.
+The conversion runs only when the new column is first added, so rerunning startup
+never restores a remark that was intentionally cleared or overwrites an edit.
+
+Older records without notes load blank. Old clients may still send item remarks;
+the API combines them into an overall remark. Clients that omit all remarks when
+editing a quotation preserve its existing overall note. An explicit empty overall
+remark clears it. Failed database initialization prevents deployment of an API
+with an incomplete schema.
 
 ## Verification
 
 Install dependencies with `pnpm install`, then run `pnpm test` (or `npm test`).
 Tests use an isolated PostgreSQL engine and a temporary local HTTP server to
-exercise migration, save/edit/read APIs, manager filters, history, blank remarks,
-and validation. UI tests cover loading, text escaping, packing variants and
+exercise migration, save/edit/read APIs, manager filters, history, overall and legacy remarks,
+and validation. UI tests cover loading, text escaping, quotation submission and
 approval invalidation. No production database is used by the tests.
 
-Print styles use A4 portrait, wrapped remark cells, repeating table headers and
+Print styles use A4 portrait, wrapped overall remarks, repeating table headers and
 page breaks between item rows. The entry table scrolls horizontally on small
 screens.

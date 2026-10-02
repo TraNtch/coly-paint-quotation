@@ -55,8 +55,8 @@ test('migration and real SQL API round trip, edits, manager filters and history'
     };
     const salesman=await request('/manager/salesmen',{managerPin:'test-manager',name:'Test Sales',salesmanPin:'8765'});
     assert.equal(salesman.status,201);
-    const payload={salesmanId:salesman.data.id,customer:'Remark Test',quoteDate:'2026-10-02',items:[
-      {desc:'Paint',code:'P1',pack:'5 LT',price:55.5,remark},
+    const payload={salesmanId:salesman.data.id,customer:'Remark Test',quoteDate:'2026-10-02',remark,items:[
+      {desc:'Paint',code:'P1',pack:'5 LT',price:55.5},
       {desc:'Old client item',price:10}
     ]};
     const saved=await request('/quotes',payload);
@@ -65,22 +65,30 @@ test('migration and real SQL API round trip, edits, manager filters and history'
     const search=await request('/manager/quotes/search',filters);
     assert.equal(search.status,200);
     assert.equal(search.data.quotes.length,1);
-    assert.equal(search.data.quotes[0].items[0].remark,remark);
+    assert.equal(search.data.quotes[0].remark,remark);
     assert.equal(search.data.quotes[0].items[1].remark,'');
     payload.id=saved.data.id;
-    payload.items[0].remark='MOQ 20 pails';
+    payload.remark='MOQ 20 pails';
     assert.equal((await request('/quotes',payload)).status,200);
     const history=await request('/salesmen/history',{salesmanId:salesman.data.id,pin:'8765'});
-    assert.equal(history.data.quotes[0].items[0].remark,'MOQ 20 pails');
-    payload.items[0].remark='';
+    assert.equal(history.data.quotes[0].remark,'MOQ 20 pails');
+    // Old clients that omit the overall field must not erase a saved note.
+    delete payload.remark;
     assert.equal((await request('/quotes',payload)).status,200);
-    assert.equal((await request('/manager/quotes/search',filters)).data.quotes[0].items[0].remark,'');
-    payload.items[0].remark='x'.repeat(1001);
+    assert.equal((await request('/manager/quotes/search',filters)).data.quotes[0].remark,'MOQ 20 pails');
+    payload.remark='';
+    assert.equal((await request('/quotes',payload)).status,200);
+    assert.equal((await request('/manager/quotes/search',filters)).data.quotes[0].remark,'');
+    payload.remark='x'.repeat(10001);
     assert.equal((await request('/quotes',payload)).status,400);
-    payload.items[0].remark={unsafe:true};
+    payload.remark={unsafe:true};
     assert.equal((await request('/quotes',payload)).status,400);
+    const oldClient=await request('/quotes',{...payload,id:null,remark:undefined,items:[{desc:'Legacy',price:5,remark:'Legacy MOQ'}]});
+    assert.equal(oldClient.status,200);
+    const oldClientHistory=await request('/salesmen/history',{salesmanId:salesman.data.id,pin:'8765'});
+    assert.equal(oldClientHistory.data.quotes.find(q=>q.id===oldClient.data.id).remark,'Legacy MOQ');
     assert.equal((await request(`/manager/quotes/${saved.data.id}/approve`,{managerPin:'test-manager'})).status,200);
-    payload.items[0].remark='Attempt to alter approved quotation';
+    payload.remark='Attempt to alter approved quotation';
     assert.equal((await request('/quotes',payload)).status,409);
   } finally {
     if(server) await new Promise(resolve=>server.close(resolve));
@@ -88,39 +96,71 @@ test('migration and real SQL API round trip, edits, manager filters and history'
   }
 });
 
-test('entry, preview, packing variants and history preserve and escape remarks', async () => {
+test('overall remark entry, preview, history and manager details', async () => {
   const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{runScripts:'outside-only'});
   const w=dom.window;
   try {
     w.alert=()=>{};
+    w.confirm=()=>true;
     w.fetch=async()=>({ok:true,json:async()=>[{id:1,name:'Test Sales'}]});
     w.eval(fs.readFileSync(path.join(root,'app-central.js'),'utf8')+';window.testState=state;');
     await new Promise(resolve=>setTimeout(resolve,0));
-    const rec={id:2,quote_no:'QT/26/001',quote_date:'2026-10-02',customer:'Test',status:'approved',items:[{desc:'Paint',price:10,remark}]};
+    const rec={id:2,quote_no:'QT/26/001',quote_date:'2026-10-02',customer:'Test',status:'approved',remark,items:[{desc:'Paint',price:10}]};
     w.loadQuoteRecord(rec,1);
-    assert.equal(w.document.querySelector('.i-remark').value,remark);
-    assert.equal(w.document.querySelector('#previewItems .item-remark').textContent,remark);
-    assert.equal(w.document.querySelectorAll('#previewItems tr:first-child td').length,6);
-    assert.equal(w.document.querySelectorAll('#previewItems tr:last-child td').length,6);
+    assert.equal(w.document.querySelector('#remark').value,remark);
+    assert.equal(w.document.querySelector('#pRemark').textContent,remark);
+    assert.equal(w.document.querySelector('#previewRemark').hidden,false);
+    assert.equal(w.document.querySelectorAll('#previewItems tr:first-child td').length,5);
+    assert.equal(w.document.querySelectorAll('#previewItems tr:last-child td').length,5);
+    assert.equal(w.document.querySelectorAll('.i-remark').length,0);
     assert.equal(w.document.querySelector('#pdfBtn').disabled,false);
-    const field=w.document.querySelector('.i-remark');
+    const field=w.document.querySelector('#remark');
     field.value='Updated MOQ';field.dispatchEvent(new w.Event('input'));
     assert.equal(w.document.querySelector('#pdfBtn').disabled,true);
     assert.equal(w.testState.currentQuoteId,null);
-    assert.equal(w.items()[0].remark,'Updated MOQ');
     w.addPackingVariant(w.document.querySelector('.variant-inline'));
-    assert.equal(w.items()[1].remark,'Updated MOQ');
-    w.loadQuoteRecord({...rec,items:[{desc:'Old quotation',price:10}]},1);
-    assert.equal(w.items()[0].remark,'');
-    w.document.body.insertAdjacentHTML('beforeend','<div id="managerQuoteDetail"></div>');
-    w.HTMLElement.prototype.scrollIntoView=()=>{};
-    // Manager script has independent lexical state, as on the actual manager page.
+    assert.equal(field.value,'Updated MOQ');
+    assert.equal(w.items()[0].remark,undefined);
+    let submitted;
+    w.fetch=async(url,options)=>{submitted=JSON.parse(options.body);return {ok:true,json:async()=>({id:3,quoteNo:'QT/26/002'})}};
+    await w.submitQuote();
+    assert.equal(submitted.remark,'Updated MOQ');
+    assert.equal(submitted.items[0].remark,undefined);
+    w.loadQuoteRecord({...rec,remark:undefined,items:[{desc:'Old quotation',price:10}]},1);
+    assert.equal(field.value,'');
+    assert.equal(w.document.querySelector('#previewRemark').hidden,true);
+    w.loadQuoteRecord({...rec,remark:undefined,items:[{desc:'Old quotation',remark:'Legacy MOQ',price:10}]},1);
+    assert.equal(field.value,'Legacy MOQ');
+    w.loadQuoteRecord({...rec,remark:'',items:[{desc:'Old quotation',remark:'Legacy MOQ',price:10}]},1);
+    assert.equal(field.value,''); // Intentional clearing takes precedence over legacy notes.
+    w.resetAllInputs();
+    assert.equal(field.value,'');
     const manager=new JSDOM('<div id="managerQuoteDetail"></div>',{runScripts:'outside-only'});
     manager.window.HTMLElement.prototype.scrollIntoView=()=>{};
     manager.window.eval(fs.readFileSync(path.join(root,'manager.js'),'utf8'));
     manager.window.showQuoteDetail({...rec,salesman:'Test Sales'});
-    assert.equal(manager.window.document.querySelector('.item-remark').textContent,remark);
-    assert.equal(manager.window.document.querySelectorAll('.manager-items th').length,6);
+    assert.equal(manager.window.document.querySelector('.remark-text').textContent,remark);
+    assert.equal(manager.window.document.querySelectorAll('.manager-items th').length,5);
+    assert.equal(manager.window.document.querySelector('.quotation-remark').previousElementSibling.className,'manager-table-wrap');
+    manager.window.showQuoteDetail({...rec,remark:'',salesman:'Test Sales'});
+    assert.equal(manager.window.document.querySelector('.quotation-remark'),null);
     manager.window.close();
   } finally { w.close(); }
+});
+
+test('migration combines existing item notes once and preserves subsequent edits', async () => {
+  const db=new PGlite();
+  try {
+    await db.exec(`CREATE TABLE quotes(id BIGINT PRIMARY KEY);
+      CREATE TABLE quote_items(quote_id BIGINT,position INTEGER,remark TEXT);
+      INSERT INTO quotes VALUES(1),(2),(3);
+      INSERT INTO quote_items VALUES(1,1,'MOQ 10 pails'),(1,2,'MOQ 10 pails'),(2,1,'First note'),(2,2,'Second note');`);
+    const migration=fs.readFileSync(path.join(root,'migrations/002_quotation_remark.sql'),'utf8');
+    await db.exec(migration);
+    assert.deepEqual((await db.query('SELECT remark FROM quotes ORDER BY id')).rows.map(q=>q.remark),['MOQ 10 pails','First note\nSecond note','']);
+    await db.exec("UPDATE quotes SET remark='' WHERE id=1; UPDATE quotes SET remark='Edited overall note' WHERE id=2;");
+    await db.exec(migration);
+    assert.deepEqual((await db.query('SELECT remark FROM quotes ORDER BY id')).rows.map(q=>q.remark),['','Edited overall note','']);
+    assert.equal((await db.query('SELECT COUNT(*)::int AS total FROM quote_items')).rows[0].total,4);
+  } finally { await db.close(); }
 });

@@ -61,21 +61,24 @@
         
       </div>
 
-      <h2 style="margin-top:14px">Items</h2><div class="small" style="margin:-4px 0 6px">Use <b>+ Pack</b> when the same product has another packing size and price. Add delivery MOQ or other notes in <b>REMARK</b>.</div>
+      <h2 style="margin-top:14px">Items</h2><div class="small" style="margin:-4px 0 6px">Use <b>+ Pack</b> when the same product has another packing size and price.</div>
       <div class="item-entry-wrap">
       <table>
         <thead>
           <tr>
-            <th style="width:7%">ITEM</th>
-            <th style="width:29%">DESCRIPTION</th>
-            <th style="width:13%">CODE</th>
+            <th style="width:10.5%">ITEM</th>
+            <th style="width:42.5%">DESCRIPTION</th>
+            <th style="width:16%">CODE</th>
             <th style="width:11%">PACKING</th>
-            <th style="width:16%">UNIT PRICE</th>
-            <th style="width:24%">REMARK</th>
+            <th style="width:20%">UNIT PRICE</th>
           </tr>
         </thead>
         <tbody id="itemRows"></tbody>
       </table>
+      </div>
+      <div class="quotation-remark-entry">
+        <label for="remark">REMARK</label>
+        <textarea id="remark" rows="3" maxlength="10000" placeholder="e.g. MOQ 10 pails for delivery / Self collect below MOQ"></textarea>
       </div>
       <div class="actions">
         <button class="btn secondary" onclick="addItem()">+ Add item</button>
@@ -132,16 +135,20 @@
         <table class="qtable coly-table">
           <thead>
             <tr>
-              <th style="width:7%">ITEM</th>
-              <th style="width:29%">DESCRIPTION</th>
-              <th style="width:13%">CODE</th>
+              <th style="width:10.5%">ITEM</th>
+              <th style="width:42.5%">DESCRIPTION</th>
+              <th style="width:16%">CODE</th>
               <th style="width:11%">PACKING</th>
-              <th style="width:16%">UNIT PRICE</th>
-              <th style="width:24%">REMARK</th>
+              <th style="width:20%">UNIT PRICE</th>
             </tr>
           </thead>
           <tbody id="previewItems"></tbody>
         </table>
+
+        <div id="previewRemark" class="quotation-remark" hidden>
+          <b>REMARK:</b>
+          <div id="pRemark" class="remark-text"></div>
+        </div>
 
         <div class="coly-terms">
           <div><b>TERMS OF PAYMENT:</b> <span id="pPayment"></span></div>

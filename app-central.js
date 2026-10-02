@@ -1,10 +1,16 @@
 const API_BASE = "https://coly-paint-quotation-api.onrender.com/api";
 const state = { approved:false, currentQuoteId:null, currentQuoteNo:"", currentStatus:"draft", historyPin:"" };
 const $ = id => document.getElementById(id);
-const watch = ["salesmanName","quoteDate","customer","attention","phone","email","address","payment"];
+const watch = ["salesmanName","quoteDate","customer","attention","phone","email","address","payment","remark"];
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function escAttr(s){return esc(s).replace(/`/g,"&#096;")}
+function quotationRemark(r){
+  // Old API responses may still supply item remarks during deployment.
+  if(typeof r.remark==="string") return r.remark;
+  return [...new Set((r.items||[]).map(it=>String(it.remark||"").trim()).filter(Boolean))].join("\n");
+}
+
 function fmtDate(v){ if(!v) return ""; const d=new Date(v+"T00:00:00"); return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`; }
 
 async function api(path, options={}){
@@ -23,17 +29,16 @@ function items(){
     desc:tr.querySelector(".i-desc")?.value||"",
     code:tr.querySelector(".i-code")?.value||"",
     pack:tr.querySelector(".i-pack")?.value||"",
-    price:parseFloat(tr.querySelector(".i-price")?.value)||0,
-    remark:tr.querySelector(".i-remark")?.value||""
+    price:parseFloat(tr.querySelector(".i-price")?.value)||0
   }));
 }
 function bindItemRow(tr){
-  tr.querySelectorAll("input, textarea").forEach(inp=>inp.addEventListener("input",()=>{
+  tr.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{
     if(state.currentStatus==="approved"){ state.currentQuoteId=null; state.currentQuoteNo=""; }
     state.approved=false; state.currentStatus="draft"; setStatus(); render();
   }));
 }
-function addItem(data={desc:"",code:"",pack:"",price:0,remark:""}){
+function addItem(data={desc:"",code:"",pack:"",price:0}){
   const tr=document.createElement("tr");
   tr.innerHTML=`
     <td><span class="item-number"></span></td>
@@ -44,15 +49,13 @@ function addItem(data={desc:"",code:"",pack:"",price:0,remark:""}){
       </div></div></td>
     <td><input class="i-code" value="${escAttr(data.code)}" placeholder="Code"></td>
     <td><input class="i-pack" value="${escAttr(data.pack)}" placeholder="e.g. 1 LT"></td>
-    <td><input class="i-price" type="number" min="0" step="0.01" value="${Number(data.price||0)}" placeholder="0.00"></td>
-    <td><textarea class="i-remark" rows="2" maxlength="1000" aria-label="Item remark" placeholder="e.g. MOQ 10 pails for delivery">${esc(data.remark)}</textarea></td>`;
+    <td><input class="i-price" type="number" min="0" step="0.01" value="${Number(data.price||0)}" placeholder="0.00"></td>`;
   bindItemRow(tr); $("itemRows").appendChild(tr); render();
 }
 function addPackingVariant(button){
   const row=button.closest("tr");
   const desc=row.querySelector(".i-desc")?.value||"";
   const code=row.querySelector(".i-code")?.value||"";
-  const remark=row.querySelector(".i-remark")?.value||"";
   const tr=document.createElement("tr");
   tr.innerHTML=`
     <td><span class="item-number"></span></td>
@@ -63,8 +66,7 @@ function addPackingVariant(button){
       </div></div></td>
     <td><input class="i-code" value="${escAttr(code)}" placeholder="Code"></td>
     <td><input class="i-pack" value="" placeholder="e.g. 5 LT"></td>
-    <td><input class="i-price" type="number" min="0" step="0.01" value="0" placeholder="0.00"></td>
-    <td><textarea class="i-remark" rows="2" maxlength="1000" aria-label="Item remark" placeholder="e.g. MOQ 10 pails for delivery">${esc(remark)}</textarea></td>`;
+    <td><input class="i-price" type="number" min="0" step="0.01" value="0" placeholder="0.00"></td>`;
   bindItemRow(tr); row.insertAdjacentElement("afterend",tr);
   state.approved=false; state.currentStatus="draft"; setStatus(); render();
   tr.querySelector(".i-pack")?.focus();
@@ -96,16 +98,18 @@ function render(){
   $("pAttention").textContent=$("attention").value||"";
   $("attnLine").style.display=$("attention").value.trim()?"block":"none";
   $("pPayment").textContent=$("payment").value||"—";
+  $("pRemark").textContent=$("remark").value;
+  $("previewRemark").hidden=!$("remark").value.trim();
   const tbody=$("previewItems"); tbody.innerHTML="";
   const list=items();
   list.forEach((it,i)=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${it.price.toFixed(2)}</td><td class="item-remark">${esc(it.remark)}</td>`;
+    tr.innerHTML=`<td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${it.price.toFixed(2)}</td>`;
     tbody.appendChild(tr);
   });
   for(let i=list.length;i<8;i++){
     const tr=document.createElement("tr");
-    tr.innerHTML="<td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td>";
+    tr.innerHTML="<td>&nbsp;</td><td></td><td></td><td></td><td></td>";
     tbody.appendChild(tr);
   }
 }
@@ -181,7 +185,7 @@ async function submitQuote(){
     id: state.currentStatus==="approved" ? null : state.currentQuoteId,
     quoteNo: state.currentQuoteNo||null,
     salesmanId:s.id, quoteDate:$("quoteDate").value, customer:$("customer").value.trim(),
-    attention:$("attention").value,phone:$("phone").value,email:$("email").value,address:$("address").value,payment:$("payment").value,
+    attention:$("attention").value,phone:$("phone").value,email:$("email").value,address:$("address").value,payment:$("payment").value,remark:$("remark").value,
     items:items()
   };
   const r=await api("/quotes",{method:"POST",body:JSON.stringify(payload)});
@@ -254,14 +258,15 @@ function loadQuoteRecord(r,salesmanId){
   $("quoteDate").value=String(r.quote_date).slice(0,10);
   $("customer").value=r.customer||""; $("attention").value=r.attention||""; $("phone").value=r.phone||"";
   $("email").value=r.email||""; $("address").value=r.address||""; $("payment").value=r.payment||"30 days";
-  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price),remark:it.remark||""}));
+  $("remark").value=quotationRemark(r);
+  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price)}));
   if(!(r.items||[]).length)addItem();
   setStatus(); render();
 }
 function resetAllInputs(){
   if(!confirm("Reset all entered quotation details?"))return;
   state.approved=false; state.currentQuoteId=null; state.currentQuoteNo=""; state.currentStatus="draft";
-  ["customer","attention","phone","email","address"].forEach(id=>$(id).value="");
+  ["customer","attention","phone","email","address","remark"].forEach(id=>$(id).value="");
   $("payment").value="30 days"; $("quoteDate").value=new Date().toISOString().slice(0,10);
   $("itemRows").innerHTML=""; addItem(); clearNamecard(); setStatus(); render();
 }
@@ -409,7 +414,8 @@ function loadManagerQuote(r){
   $("quoteDate").value=String(r.quote_date).slice(0,10);
   $("customer").value=r.customer||""; $("attention").value=r.attention||""; $("phone").value=r.phone||"";
   $("email").value=r.email||""; $("address").value=r.address||""; $("payment").value=r.payment||"30 days";
-  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price),remark:it.remark||""}));
+  $("remark").value=quotationRemark(r);
+  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price)}));
   if(!(r.items||[]).length)addItem();
   setStatus(); render();
   window.scrollTo({top:0,behavior:"smooth"});

@@ -3,6 +3,12 @@ const $=id=>document.getElementById(id);
 let managerPin="";
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function escAttr(s){return esc(s).replace(/\x60/g,"&#096;")}
+function quotationRemark(r){
+  // Old API responses may still supply item remarks during deployment.
+  if(typeof r.remark==="string") return r.remark;
+  return [...new Set((r.items||[]).map(it=>String(it.remark||"").trim()).filter(Boolean))].join("\n");
+}
+
 function fmtDate(v){if(!v)return"";const d=new Date(v+"T00:00:00");return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`}
 async function api(path,options={}){
   const res=await fetch(API_BASE+path,{headers:{"Content-Type":"application/json",...(options.headers||{})},...options});
@@ -91,10 +97,11 @@ function showQuoteDetail(r){
     </div>
     <div class="manager-table-wrap" style="margin-top:12px">
     <table class="manager-table manager-items">
-      <thead><tr><th>Item</th><th>Description</th><th>Code</th><th>Packing</th><th>Unit Price</th><th>Remark</th></tr></thead>
-      <tbody>${(r.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${Number(it.price||0).toFixed(2)}</td><td class="item-remark">${esc(it.remark)}</td></tr>`).join("")}</tbody>
+      <thead><tr><th>Item</th><th>Description</th><th>Code</th><th>Packing</th><th>Unit Price</th></tr></thead>
+      <tbody>${(r.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${Number(it.price||0).toFixed(2)}</td></tr>`).join("")}</tbody>
     </table>
     </div>
+    ${quotationRemark(r).trim()?`<div class="quotation-remark"><b>REMARK:</b><div class="remark-text">${esc(quotationRemark(r))}</div></div>`:""}
     <div class="actions">
       ${r.status!=="approved"?`<button class="btn success" onclick="approveQuote(${r.id})">Approve Quotation</button>`:""}
       ${r.status!=="rejected"?`<button class="btn secondary" onclick="rejectQuote(${r.id})">Reject / Return</button>`:""}

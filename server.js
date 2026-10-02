@@ -55,6 +55,7 @@ async function initDb(){
       email TEXT DEFAULT '',
       address TEXT DEFAULT '',
       payment TEXT DEFAULT '30 days',
+      remark TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
       approved_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -74,6 +75,7 @@ async function initDb(){
     CREATE INDEX IF NOT EXISTS idx_quotes_customer_lower ON quotes(LOWER(customer));
   `);
   await pool.query(fs.readFileSync(path.join(__dirname,"migrations/001_item_remark.sql"),"utf8"));
+  await pool.query(fs.readFileSync(path.join(__dirname,"migrations/002_quotation_remark.sql"),"utf8"));
 }
 
 async function verifySalesman(salesmanId,pin){
@@ -241,6 +243,13 @@ app.post("/api/quotes", requireDb, async (req,res)=>{
     return res.status(400).json({error:"Item remark must be text of at most 1000 characters"});
   }
 
+  if(b.remark != null && (typeof b.remark!=="string" || b.remark.length>10000)){
+    return res.status(400).json({error:"Quotation remark must be text of at most 10000 characters"});
+  }
+  // Retain compatibility with clients that still send individual item remarks.
+  const legacyRemarks=[...new Set(b.items.map(it=>String(it?.remark||"").trim()).filter(Boolean))].join("\n");
+  const overallRemark=b.remark ?? (legacyRemarks || null);
+
   const client = await pool.connect();
   try{
     await client.query("BEGIN");
@@ -251,17 +260,17 @@ app.post("/api/quotes", requireDb, async (req,res)=>{
       if(!own.rowCount) throw Object.assign(new Error("Quote not found"),{status:404});
       if(own.rows[0].status==="approved") throw Object.assign(new Error("Approved quotation cannot be edited; create a new quotation instead."),{status:409});
       await client.query(`
-        UPDATE quotes SET salesman_id=$1,quote_date=$2,customer=$3,attention=$4,phone=$5,email=$6,address=$7,payment=$8,status='pending',updated_at=NOW()
+        UPDATE quotes SET salesman_id=$1,quote_date=$2,customer=$3,attention=$4,phone=$5,email=$6,address=$7,payment=$8,remark=COALESCE($10,remark),status='pending',updated_at=NOW()
         WHERE id=$9
-      `,[b.salesmanId,b.quoteDate||new Date().toISOString().slice(0,10),b.customer,b.attention||"",b.phone||"",b.email||"",b.address||"",b.payment||"30 days",quoteId]);
+      `,[b.salesmanId,b.quoteDate||new Date().toISOString().slice(0,10),b.customer,b.attention||"",b.phone||"",b.email||"",b.address||"",b.payment||"30 days",quoteId,overallRemark]);
       await client.query("DELETE FROM quote_items WHERE quote_id=$1",[quoteId]);
     } else {
       quoteNo = await nextQuoteNo(client);
       const q = await client.query(`
-        INSERT INTO quotes(quote_no,salesman_id,quote_date,customer,attention,phone,email,address,payment,status)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending')
+        INSERT INTO quotes(quote_no,salesman_id,quote_date,customer,attention,phone,email,address,payment,remark,status)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending')
         RETURNING id,quote_no
-      `,[quoteNo,b.salesmanId,b.quoteDate||new Date().toISOString().slice(0,10),b.customer,b.attention||"",b.phone||"",b.email||"",b.address||"",b.payment||"30 days"]);
+      `,[quoteNo,b.salesmanId,b.quoteDate||new Date().toISOString().slice(0,10),b.customer,b.attention||"",b.phone||"",b.email||"",b.address||"",b.payment||"30 days",overallRemark||""]);
       quoteId = q.rows[0].id;
     }
     for(let i=0;i<b.items.length;i++){
@@ -336,7 +345,7 @@ app.post("/api/manager/quotes/search", requireDb, async (req,res)=>{
   }
   const clause = where.length ? "WHERE "+where.join(" AND ") : "";
   const rows = await pool.query(`
-    SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.status,
+    SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.remark,q.status,
            q.approved_at,q.created_at,q.updated_at,q.salesman_id,s.name AS salesman,
       COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'remark',COALESCE(i.remark,''),'position',i.position)
         ORDER BY i.position) FILTER (WHERE i.id IS NOT NULL),'[]'::json) AS items
@@ -371,7 +380,7 @@ app.post("/api/salesmen/history", requireDb, async (req,res)=>{
     where += " AND (q.customer ILIKE $2 OR q.quote_no ILIKE $2)";
   }
   const rows=await pool.query(`
-    SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.status,q.approved_at,q.created_at,
+    SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.remark,q.status,q.approved_at,q.created_at,
       COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'remark',COALESCE(i.remark,''),'position',i.position)
         ORDER BY i.position) FILTER (WHERE i.id IS NOT NULL),'[]'::json) AS items
     FROM quotes q

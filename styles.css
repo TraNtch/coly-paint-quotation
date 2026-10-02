@@ -680,27 +680,21 @@ th{font-size:12px;color:#4b5563}
 }
 
 
-/* Item remarks: readable entry fields and wrapped notes on the A4 sheet. */
+/* Overall quotation remark below the items table. */
 .item-entry-wrap{overflow-x:auto;border:1px solid #d1d5db}
-.item-entry-wrap table{min-width:720px;table-layout:fixed}
-.editor #itemRows .i-remark{
-  display:block;width:100%;min-height:54px;min-width:0;
-  border:0;border-radius:0;padding:6px;font-size:12px;line-height:1.35;
-  resize:vertical;
-}
-.editor #itemRows .desc-wrap{flex-wrap:wrap}
-.editor #itemRows .desc-wrap input{flex-basis:100%}
-.editor #itemRows .desc-actions{margin-left:auto}
-.item-remark{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
-.coly-table td.item-remark{line-height:1.35}
+.item-entry-wrap table{min-width:560px;table-layout:fixed}
+.quotation-remark-entry{margin-top:12px}
+.quotation-remark-entry textarea{line-height:1.4}
+.quotation-remark{margin-top:14px;font-size:11.5px;line-height:1.45}
+.quotation-remark[hidden]{display:none}
+.remark-text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
 .coly-table td:nth-child(5){white-space:normal}
-.manager-items{min-width:640px;table-layout:fixed}
-.manager-items th:nth-child(1){width:7%}
-.manager-items th:nth-child(2){width:29%}
-.manager-items th:nth-child(3){width:13%}
+.manager-items{min-width:560px;table-layout:fixed}
+.manager-items th:nth-child(1){width:10.5%}
+.manager-items th:nth-child(2){width:42.5%}
+.manager-items th:nth-child(3){width:16%}
 .manager-items th:nth-child(4){width:11%}
-.manager-items th:nth-child(5){width:16%}
-.manager-items th:nth-child(6){width:24%}
+.manager-items th:nth-child(5){width:20%}
 .manager-items td{overflow-wrap:anywhere}
 @media print{
   html,body{width:auto!important}
@@ -708,4 +702,6 @@ th{font-size:12px;color:#4b5563}
   .coly-table thead{display:table-header-group}
   .coly-table tr{break-inside:avoid;page-break-inside:avoid}
   .coly-terms{break-inside:avoid;page-break-inside:avoid}
+  .quotation-remark{font-size:8.5pt}
+  .quotation-remark>b{break-after:avoid;page-break-after:avoid}
 }
