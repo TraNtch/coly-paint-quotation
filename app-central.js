@@ -23,16 +23,17 @@ function items(){
     desc:tr.querySelector(".i-desc")?.value||"",
     code:tr.querySelector(".i-code")?.value||"",
     pack:tr.querySelector(".i-pack")?.value||"",
-    price:parseFloat(tr.querySelector(".i-price")?.value)||0
+    price:parseFloat(tr.querySelector(".i-price")?.value)||0,
+    remark:tr.querySelector(".i-remark")?.value||""
   }));
 }
 function bindItemRow(tr){
-  tr.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{
+  tr.querySelectorAll("input, textarea").forEach(inp=>inp.addEventListener("input",()=>{
     if(state.currentStatus==="approved"){ state.currentQuoteId=null; state.currentQuoteNo=""; }
     state.approved=false; state.currentStatus="draft"; setStatus(); render();
   }));
 }
-function addItem(data={desc:"",code:"",pack:"",price:0}){
+function addItem(data={desc:"",code:"",pack:"",price:0,remark:""}){
   const tr=document.createElement("tr");
   tr.innerHTML=`
     <td><span class="item-number"></span></td>
@@ -43,13 +44,15 @@ function addItem(data={desc:"",code:"",pack:"",price:0}){
       </div></div></td>
     <td><input class="i-code" value="${escAttr(data.code)}" placeholder="Code"></td>
     <td><input class="i-pack" value="${escAttr(data.pack)}" placeholder="e.g. 1 LT"></td>
-    <td><input class="i-price" type="number" min="0" step="0.01" value="${Number(data.price||0)}" placeholder="0.00"></td>`;
+    <td><input class="i-price" type="number" min="0" step="0.01" value="${Number(data.price||0)}" placeholder="0.00"></td>
+    <td><textarea class="i-remark" rows="2" maxlength="1000" aria-label="Item remark" placeholder="e.g. MOQ 10 pails for delivery">${esc(data.remark)}</textarea></td>`;
   bindItemRow(tr); $("itemRows").appendChild(tr); render();
 }
 function addPackingVariant(button){
   const row=button.closest("tr");
   const desc=row.querySelector(".i-desc")?.value||"";
   const code=row.querySelector(".i-code")?.value||"";
+  const remark=row.querySelector(".i-remark")?.value||"";
   const tr=document.createElement("tr");
   tr.innerHTML=`
     <td><span class="item-number"></span></td>
@@ -60,7 +63,8 @@ function addPackingVariant(button){
       </div></div></td>
     <td><input class="i-code" value="${escAttr(code)}" placeholder="Code"></td>
     <td><input class="i-pack" value="" placeholder="e.g. 5 LT"></td>
-    <td><input class="i-price" type="number" min="0" step="0.01" value="0" placeholder="0.00"></td>`;
+    <td><input class="i-price" type="number" min="0" step="0.01" value="0" placeholder="0.00"></td>
+    <td><textarea class="i-remark" rows="2" maxlength="1000" aria-label="Item remark" placeholder="e.g. MOQ 10 pails for delivery">${esc(remark)}</textarea></td>`;
   bindItemRow(tr); row.insertAdjacentElement("afterend",tr);
   state.approved=false; state.currentStatus="draft"; setStatus(); render();
   tr.querySelector(".i-pack")?.focus();
@@ -96,12 +100,12 @@ function render(){
   const list=items();
   list.forEach((it,i)=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${it.price.toFixed(2)}</td>`;
+    tr.innerHTML=`<td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${it.price.toFixed(2)}</td><td class="item-remark">${esc(it.remark)}</td>`;
     tbody.appendChild(tr);
   });
   for(let i=list.length;i<8;i++){
     const tr=document.createElement("tr");
-    tr.innerHTML="<td>&nbsp;</td><td></td><td></td><td></td><td></td>";
+    tr.innerHTML="<td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td>";
     tbody.appendChild(tr);
   }
 }
@@ -250,7 +254,7 @@ function loadQuoteRecord(r,salesmanId){
   $("quoteDate").value=String(r.quote_date).slice(0,10);
   $("customer").value=r.customer||""; $("attention").value=r.attention||""; $("phone").value=r.phone||"";
   $("email").value=r.email||""; $("address").value=r.address||""; $("payment").value=r.payment||"30 days";
-  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price)}));
+  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price),remark:it.remark||""}));
   if(!(r.items||[]).length)addItem();
   setStatus(); render();
 }
@@ -405,7 +409,7 @@ function loadManagerQuote(r){
   $("quoteDate").value=String(r.quote_date).slice(0,10);
   $("customer").value=r.customer||""; $("attention").value=r.attention||""; $("phone").value=r.phone||"";
   $("email").value=r.email||""; $("address").value=r.address||""; $("payment").value=r.payment||"30 days";
-  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price)}));
+  $("itemRows").innerHTML=""; (r.items||[]).forEach(it=>addItem({desc:it.desc,code:it.code,pack:it.pack,price:Number(it.price),remark:it.remark||""}));
   if(!(r.items||[]).length)addItem();
   setStatus(); render();
   window.scrollTo({top:0,behavior:"smooth"});

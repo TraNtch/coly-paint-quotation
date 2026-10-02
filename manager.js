@@ -89,10 +89,12 @@ function showQuoteDetail(r){
       <div><label>Email</label><div>${esc(r.email||"")}</div></div>
       <div class="full"><label>Address</label><div>${esc(r.address||"")}</div></div>
     </div>
-    <table class="manager-table" style="margin-top:12px">
-      <thead><tr><th>Item</th><th>Description</th><th>Code</th><th>Packing</th><th>Unit Price</th></tr></thead>
-      <tbody>${(r.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${Number(it.price||0).toFixed(2)}</td></tr>`).join("")}</tbody>
+    <div class="manager-table-wrap" style="margin-top:12px">
+    <table class="manager-table manager-items">
+      <thead><tr><th>Item</th><th>Description</th><th>Code</th><th>Packing</th><th>Unit Price</th><th>Remark</th></tr></thead>
+      <tbody>${(r.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.desc)}</td><td>${esc(it.code)}</td><td>${esc(it.pack)}</td><td>RM ${Number(it.price||0).toFixed(2)}</td><td class="item-remark">${esc(it.remark)}</td></tr>`).join("")}</tbody>
     </table>
+    </div>
     <div class="actions">
       ${r.status!=="approved"?`<button class="btn success" onclick="approveQuote(${r.id})">Approve Quotation</button>`:""}
       ${r.status!=="rejected"?`<button class="btn secondary" onclick="rejectQuote(${r.id})">Reject / Return</button>`:""}

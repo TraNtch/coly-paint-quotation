@@ -1,4 +1,6 @@
 const express = require("express");
+const fs = require("node:fs");
+const path = require("node:path");
 const cors = require("cors");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
@@ -65,11 +67,13 @@ async function initDb(){
       description TEXT DEFAULT '',
       code TEXT DEFAULT '',
       packing TEXT DEFAULT '',
+      remark TEXT NOT NULL DEFAULT '',
       unit_price NUMERIC(12,2) NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_quotes_salesman ON quotes(salesman_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_quotes_customer_lower ON quotes(LOWER(customer));
   `);
+  await pool.query(fs.readFileSync(path.join(__dirname,"migrations/001_item_remark.sql"),"utf8"));
 }
 
 async function verifySalesman(salesmanId,pin){
@@ -233,6 +237,10 @@ app.post("/api/quotes", requireDb, async (req,res)=>{
   if(!String(b.customer||"").trim()) return res.status(400).json({error:"Customer required"});
   if(!Array.isArray(b.items) || !b.items.length) return res.status(400).json({error:"At least one item required"});
 
+  if(b.items.some(it=>it && it.remark != null && (typeof it.remark!=="string" || it.remark.length>1000))){
+    return res.status(400).json({error:"Item remark must be text of at most 1000 characters"});
+  }
+
   const client = await pool.connect();
   try{
     await client.query("BEGIN");
@@ -259,9 +267,9 @@ app.post("/api/quotes", requireDb, async (req,res)=>{
     for(let i=0;i<b.items.length;i++){
       const it=b.items[i]||{};
       await client.query(`
-        INSERT INTO quote_items(quote_id,position,description,code,packing,unit_price)
-        VALUES($1,$2,$3,$4,$5,$6)
-      `,[quoteId,i+1,it.desc||"",it.code||"",it.pack||"",Number(it.price)||0]);
+        INSERT INTO quote_items(quote_id,position,description,code,packing,unit_price,remark)
+        VALUES($1,$2,$3,$4,$5,$6,$7)
+      `,[quoteId,i+1,it.desc||"",it.code||"",it.pack||"",Number(it.price)||0,it.remark??""]);
     }
     await client.query("COMMIT");
     res.json({id:quoteId,quoteNo,status:"pending"});
@@ -312,25 +320,25 @@ app.post("/api/manager/quotes/search", requireDb, async (req,res)=>{
   const where=[];
   if(String(query||"").trim()){
     vals.push(`%${String(query).trim()}%`);
-    where.push(`(q.quote_no ILIKE ${vals.length} OR q.customer ILIKE ${vals.length} OR s.name ILIKE ${vals.length})`);
+    where.push(`(q.quote_no ILIKE $${vals.length} OR q.customer ILIKE $${vals.length} OR s.name ILIKE $${vals.length})`);
   }
   if(status && ["pending","approved","rejected"].includes(status)){
-    vals.push(status); where.push(`q.status=${vals.length}`);
+    vals.push(status); where.push(`q.status=$${vals.length}`);
   }
   if(salesmanId){
-    vals.push(Number(salesmanId)); where.push(`q.salesman_id=${vals.length}`);
+    vals.push(Number(salesmanId)); where.push(`q.salesman_id=$${vals.length}`);
   }
   if(dateFrom){
-    vals.push(dateFrom); where.push(`q.quote_date >= ${vals.length}`);
+    vals.push(dateFrom); where.push(`q.quote_date >= $${vals.length}`);
   }
   if(dateTo){
-    vals.push(dateTo); where.push(`q.quote_date <= ${vals.length}`);
+    vals.push(dateTo); where.push(`q.quote_date <= $${vals.length}`);
   }
   const clause = where.length ? "WHERE "+where.join(" AND ") : "";
   const rows = await pool.query(`
     SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.status,
            q.approved_at,q.created_at,q.updated_at,q.salesman_id,s.name AS salesman,
-      COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'position',i.position)
+      COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'remark',COALESCE(i.remark,''),'position',i.position)
         ORDER BY i.position) FILTER (WHERE i.id IS NOT NULL),'[]'::json) AS items
     FROM quotes q
     JOIN salesmen s ON s.id=q.salesman_id
@@ -364,7 +372,7 @@ app.post("/api/salesmen/history", requireDb, async (req,res)=>{
   }
   const rows=await pool.query(`
     SELECT q.id,q.quote_no,q.quote_date,q.customer,q.attention,q.phone,q.email,q.address,q.payment,q.status,q.approved_at,q.created_at,
-      COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'position',i.position)
+      COALESCE(json_agg(json_build_object('desc',i.description,'code',i.code,'pack',i.packing,'price',i.unit_price,'remark',COALESCE(i.remark,''),'position',i.position)
         ORDER BY i.position) FILTER (WHERE i.id IS NOT NULL),'[]'::json) AS items
     FROM quotes q
     LEFT JOIN quote_items i ON i.quote_id=q.id
@@ -385,5 +393,5 @@ initDb().then(()=>{
   app.listen(port,()=>console.log(`Coly quotation API listening on ${port}`));
 }).catch(err=>{
   console.error("DB initialization failed",err);
-  app.listen(port,()=>console.log(`API started without initialized DB on ${port}`));
+  process.exitCode=1;
 });
