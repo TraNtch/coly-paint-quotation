@@ -19,11 +19,10 @@ app.use(cors({
 }));
 app.use(express.json({limit:"2mb"}));
 
-const sourcePool = process.env.DATABASE_URL ? new Pool({
+const pool = process.env.DATABASE_URL ? new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false }
 }) : null;
-let pool = sourcePool;
 
 function requireDb(req,res,next){
   if(!pool) return res.status(503).json({error:"Database not linked yet. Set DATABASE_URL in Render."});
@@ -31,7 +30,7 @@ function requireDb(req,res,next){
 }
 function managerOk(pin){ return String(pin||"") === String(managerPin); }
 
-async function initDb(pool = sourcePool){
+async function initDb(){
   if(!pool) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS salesmen (
@@ -399,19 +398,7 @@ app.use((err,req,res,next)=>{
   res.status(500).json({error:"Server error"});
 });
 
-initDb().then(async()=>{
-  if(process.env.MIGRATION_TARGET_DATABASE_URL){
-    const targetPool = new Pool({connectionString:process.env.MIGRATION_TARGET_DATABASE_URL,
-      ssl:{rejectUnauthorized:true}});
-    await initDb(targetPool);
-    const {createStorageTransfer} = require('./storage-transfer');
-    const bridge = await createStorageTransfer(sourcePool,targetPool,process.env.MIGRATION_ID);
-    pool = bridge.pool;
-    if(process.env.MIGRATION_COMMIT === process.env.MIGRATION_ID){
-      console.log('Online storage transfer',JSON.stringify(await bridge.transfer()));
-    }
-    console.log('Online storage routing ready');
-  }
+initDb().then(()=>{
   app.listen(port,()=>console.log(`Coly quotation API listening on ${port}`));
 }).catch(err=>{
   console.error("DB initialization failed",err);
